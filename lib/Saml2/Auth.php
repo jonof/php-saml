@@ -143,8 +143,8 @@ class OneLogin_Saml2_Auth
     public function processSLO($keepLocalSession = false, $requestId = null, $retrieveParametersFromServer = false, $cbDeleteSession = null)
     {
         $this->_errors = array();
-        if (isset($_GET) && isset($_GET['SAMLResponse'])) {
-            $logoutResponse = new OneLogin_Saml2_LogoutResponse($this->_settings, $_GET['SAMLResponse']);
+        if (isset($_REQUEST) && isset($_REQUEST['SAMLResponse'])) {
+            $logoutResponse = new OneLogin_Saml2_LogoutResponse($this->_settings, $_REQUEST['SAMLResponse']);
             if (!$logoutResponse->isValid($requestId, $retrieveParametersFromServer)) {
                 $this->_errors[] = 'invalid_logout_response';
                 $this->_errorReason = $logoutResponse->getError();
@@ -159,8 +159,8 @@ class OneLogin_Saml2_Auth
                     }
                 }
             }
-        } else if (isset($_GET) && isset($_GET['SAMLRequest'])) {
-            $logoutRequest = new OneLogin_Saml2_LogoutRequest($this->_settings, $_GET['SAMLRequest']);
+        } else if (isset($_REQUEST) && isset($_REQUEST['SAMLRequest'])) {
+            $logoutRequest = new OneLogin_Saml2_LogoutRequest($this->_settings, $_REQUEST['SAMLRequest']);
             if (!$logoutRequest->isValid($retrieveParametersFromServer)) {
                 $this->_errors[] = 'invalid_logout_request';
                 $this->_errorReason = $logoutRequest->getError();
@@ -175,11 +175,23 @@ class OneLogin_Saml2_Auth
                 $inResponseTo = $logoutRequest->id;
                 $responseBuilder = new OneLogin_Saml2_LogoutResponse($this->_settings);
                 $responseBuilder->build($inResponseTo);
-                $logoutResponse = $responseBuilder->getResponse();
+
+                $responseUrl = $this->getSLOResponseUrl();
+                if (empty($responseUrl)) {
+                    $responseUrl = $this->getSLOurl();
+                }
+
+                if ($this->getSLObinding() === OneLogin_Saml2_Constants::BINDING_HTTP_POST) {
+                    $logoutResponse = $responseBuilder->getUncompressedResponse();
+                    $postredirect = true;
+                } else {
+                    $logoutResponse = $responseBuilder->getResponse();
+                    $postredirect = false;
+                }
 
                 $parameters = array('SAMLResponse' => $logoutResponse);
-                if (isset($_GET['RelayState'])) {
-                    $parameters['RelayState'] = $_GET['RelayState'];
+                if (isset($_REQUEST['RelayState'])) {
+                    $parameters['RelayState'] = $_REQUEST['RelayState'];
                 }
 
                 $security = $this->_settings->getSecurityData();
@@ -189,7 +201,7 @@ class OneLogin_Saml2_Auth
                     $parameters['Signature'] = $signature;
                 }
 
-                return $this->redirectTo($this->getSLOurl(), $parameters);
+                return $this->redirectTo($responseUrl, $parameters, $postredirect);
             }
         } else {
             $this->_errors[] = 'invalid_binding';
@@ -206,14 +218,20 @@ class OneLogin_Saml2_Auth
      *
      * @param string $url        The target URL to redirect the user.
      * @param array  $parameters Extra parameters to be passed as part of the url
+     * @param boolean $post      Redirect by way of a form POST.
      */
-    public function redirectTo($url = '', $parameters = array())
+    public function redirectTo($url = '', $parameters = array(), $post = false)
     {
         assert('is_string($url)');
         assert('is_array($parameters)');
 
         if (empty($url) && isset($_REQUEST['RelayState'])) {
             $url = $_REQUEST['RelayState'];
+        }
+
+        if ($post) {
+            OneLogin_Saml2_Utils::postRedirect($url, $parameters);
+            exit;
         }
 
         return OneLogin_Saml2_Utils::redirect($url, $parameters);
@@ -366,7 +384,13 @@ class OneLogin_Saml2_Auth
 
         $logoutRequest = new OneLogin_Saml2_LogoutRequest($this->_settings, null, $nameId, $sessionIndex);
 
-        $samlRequest = $logoutRequest->getRequest();
+        if ($this->getSLObinding() === OneLogin_Saml2_Constants::BINDING_HTTP_POST) {
+            $samlRequest = $logoutRequest->getUncompressedRequest();
+            $postredirect = true;
+        } else {
+            $samlRequest = $logoutRequest->getRequest();
+            $postredirect = false;
+        }
 
         $parameters['SAMLRequest'] = $samlRequest;
         if (!empty($returnTo)) {
@@ -382,7 +406,7 @@ class OneLogin_Saml2_Auth
             $parameters['Signature'] = $signature;
         }
 
-        return $this->redirectTo($sloUrl, $parameters);
+        return $this->redirectTo($sloUrl, $parameters, $postredirect);
     }
 
     /**
@@ -399,7 +423,7 @@ class OneLogin_Saml2_Auth
     /**
      * Gets the SLO url.
      *
-     * @return string The url of the Single Logout Service
+     * @return string The url of the Single Logout Service request
      */
     public function getSLOurl()
     {
@@ -409,6 +433,36 @@ class OneLogin_Saml2_Auth
             $url = $idpData['singleLogoutService']['url'];
         }
         return $url;
+    }
+
+    /**
+     * Gets the SLO response url.
+     *
+     * @return string The url of the Single Logout Service response
+     */
+    public function getSLOResponseUrl()
+    {
+        $url = null;
+        $idpData = $this->_settings->getIdPData();
+        if (isset($idpData['singleLogoutService']) && isset($idpData['singleLogoutService']['responseUrl'])) {
+            $url = $idpData['singleLogoutService']['responseUrl'];
+        }
+        return $url;
+    }
+
+    /**
+     * Gets the SLO binding.
+     *
+     * @return string A OneLogin_Saml2_Constants binding value
+     */
+    public function getSLObinding()
+    {
+        $binding = null;
+        $idpData = $this->_settings->getIdPData();
+        if (isset($idpData['singleLogoutService']) && isset($idpData['singleLogoutService']['binding'])) {
+            $binding = $idpData['singleLogoutService']['binding'];
+        }
+        return $binding;
     }
 
     /**

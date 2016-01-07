@@ -120,6 +120,16 @@ LOGOUTREQUEST;
     }
 
     /**
+     * Returns the Logout Request without any compression applied.
+     *
+     * @return string base64 encoded Logout Request
+     */
+    public function getUncompressedRequest()
+    {
+        return base64_encode($this->_logoutRequest);
+    }
+
+    /**
      * Returns the ID of the Logout Request.
      *
      * @param string|DOMDocument $request Logout Request Message

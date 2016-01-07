@@ -31,7 +31,7 @@ $settings = array (
             'url' => '',
             // SAML protocol binding to be used when returning the <Response>
             // message.  Onelogin Toolkit supports for this endpoint the
-            // HTTP-Redirect binding only
+            // HTTP-Redirect and HTTP-POST bindings only
             'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
         ),
         // Specifies constraints on the name identifier to be used to
@@ -62,9 +62,12 @@ $settings = array (
         'singleLogoutService' => array (
             // URL Location of the IdP where the SP will send the SLO Request
             'url' => '',
+            // URL Location of the IdP where the SP will send the SLO Response.
+            // If not set, the 'url' value will be used.
+            'responseUrl' => '',
             // SAML protocol binding to be used when returning the <Response>
             // message.  Onelogin Toolkit supports for this endpoint the
-            // HTTP-Redirect binding only
+            // HTTP-Redirect and HTTP-POST bindings only
             'binding' => 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
         ),
         // Public x509 certificate of the IdP

@@ -243,6 +243,46 @@ class OneLogin_Saml2_Utils
     }
 
     /**
+     * Executes a redirection to the provided url by emitting an auto-submit form.
+     *
+     * @param string  $url        The target url
+     * @param array   $parameters Extra parameters to be passed as part of the url
+     */
+    public static function postRedirect($url, $parameters = array())
+    {
+        header('Pragma: no-cache');
+        header('Cache-Control: no-cache, must-revalidate');
+
+        $hidden = array();
+        foreach ($parameters as $name => $value) {
+            $value = htmlspecialchars($value);
+            $hidden[] = "<input type=\"hidden\" name=\"{$name}\" value=\"{$value}\"/>";
+        }
+        $hidden = implode("\n", $hidden);
+
+        echo <<<EOT
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+  "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+ <body onload="document.forms[0].submit()">
+  <noscript>
+   <p><strong>Note:</strong> Since your browser does not support JavaScript,
+   you must press the Continue button once to proceed.</p>
+  </noscript>
+  <form action="{$url}" method="post">
+    <div>{$hidden}</div>
+    <noscript>
+     <div><input type="submit" value="Continue"/></div>
+    </noscript>
+  </form>
+ </body>
+</html>
+EOT;
+        exit;
+    }
+
+    /**
      * Returns the protocol + the current host + the port (if different than
      * common ports).
      *
